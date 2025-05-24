@@ -3,7 +3,9 @@ from pydantic import ValidationError
 from ml.common.schemas.california_housing_model import CaliforniaHousingModel
 import logging
 
-from ml.random_forest_prediction import RandomForestPrediction
+from ml.model.random_forest_prediction import RandomForestPrediction
+
+
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)

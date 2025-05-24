@@ -37,6 +37,10 @@ args = ["${file}"]
 env = { PYTHONPATH = "." }
 
 
+
+[tasks.train]
+cmd = ["python", "ml/model/random_forest_prediction.py"]
+
 [tasks.up]
 cmd = ["python", "main.py"]
 
