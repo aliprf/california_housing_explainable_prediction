@@ -1,4 +1,6 @@
 import os
+from random import randint
+
 import logging
 from typing import Union
 import pandas as pd
@@ -7,12 +9,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, f1_score, precision_score, recall_score
 import joblib
 
+
+from config import Config
+
 from ml.common.schemas.california_housing_model import CaliforniaHousingModel
 from ml.data_parser.data_parser import DataParser
 
-# -----------------------
-# Configure Logger
-# -----------------------
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -20,9 +23,8 @@ if not logger.handlers:
     handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s - %(message)s"))
     logger.addHandler(handler)
 
-
 class RandomForestPrediction:
-    def __init__(self, model_path: str = "./ml/weights/random_forest.pkl"):
+    def __init__(self, model_path: str = Config.MODEL_PATH):
         self.model_path = model_path
         self.model = None
         self.data_parser = DataParser()
@@ -34,7 +36,7 @@ class RandomForestPrediction:
         self.y_train = None
         self.y_test = None
 
-    def train(self, test_size: float = 0.2, random_state: int = 42, **rf_kwargs):
+    def train(self, test_size: float = 0.25, random_state: int = randint(1, 100), **rf_kwargs):
         logger.info("Training Random Forest model.")
         X = self.df.drop("MedHouseVal", axis=1)
         y = self.df["MedHouseVal"]
@@ -60,8 +62,12 @@ class RandomForestPrediction:
             joblib.dump(self.model, self.model_path)
             logger.info(f"Model saved to {self.model_path}")
             # Save test set as well for later evaluation
-            self.X_test.to_csv("./ml/weights/X_test.csv", index=False)
-            self.y_test.to_csv("./ml/weights/y_test.csv", index=False)
+            
+            if self.X_test is None or self.y_test is None:
+                raise ValueError("test ds was not found")
+            
+            self.X_test.to_csv(Config.X_TEST_PATH, index=False)
+            self.y_test.to_csv(Config.Y_TEST_PATH, index=False)
             logger.info("Test set saved for later evaluation.")
         else:
             logger.error("No model to save. Train a model first.")
@@ -71,11 +77,12 @@ class RandomForestPrediction:
         if os.path.exists(self.model_path):
             self.model = joblib.load(self.model_path)
             logger.info(f"Model loaded from {self.model_path}")
+            
             # Load the saved test set
-            self.X_test = pd.read_csv("./ml/weights/X_test.csv")
+            self.X_test = pd.read_csv(Config.X_TEST_PATH)
             self.y_test = pd.read_csv(
-                "./ml/weights/y_test.csv"
-            ).squeeze()  # squeeze to Series
+                Config.Y_TEST_PATH
+            ).squeeze()
             logger.info("Test set loaded for evaluation.")
         else:
             logger.error(f"No model file found at {self.model_path}")
@@ -111,8 +118,8 @@ class RandomForestPrediction:
         self,
         y_true,
         y_pred,
-        threshold: float = None,
-        save_path: str = "./ml/weights/evaluation_metrics.txt",
+        threshold: float| None = None,
+        save_path: str = f"{Config.RF_MODEL_WEIGHTS_PATH}evaluation_metrics.txt",
     ):
         if threshold is None:
             threshold = pd.Series(y_true).median()
@@ -149,12 +156,14 @@ if __name__ == "__main__":
     trainer = RandomForestPrediction()
 
     # Step 1: Train and save model
-    # trainer.train()
-    # trainer.save_model()
+    trainer.train()
+    trainer.save_model()
 
-    # #
-    # y_pred = trainer.predict_df(trainer.X_test)
-    # trainer.evaluate(trainer.y_test, y_pred)
+    #
+    if trainer.X_test is None:
+        raise ValueError("trainer.X_test is None!!")
+    y_pred = trainer.predict_df(trainer.X_test)
+    trainer.evaluate(trainer.y_test, y_pred)
 
     # Step 2: Load weights and predict on a sample input
     trainer.load_model()

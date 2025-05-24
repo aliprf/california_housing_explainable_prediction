@@ -13,5 +13,4 @@ def run_gradio():
 if __name__ == "__main__":
     t1 = threading.Thread(target=run_flask)
     t1.start()
-    
     run_gradio() 

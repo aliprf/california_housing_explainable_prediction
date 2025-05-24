@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.datasets import fetch_california_housing
 
 from ml.common.schemas.california_housing_model import CaliforniaHousingModel
+from config import Config
 
 import logging
 
@@ -11,7 +12,7 @@ logger.setLevel(logging.INFO)
 
 
 class DataParser:
-    def __init__(self, cache_path: str = "./ml/data/california_housing.csv"):
+    def __init__(self, cache_path: str = Config.RAW_DATASOURCE_FILE):
         self.cache_path = cache_path
         os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
 
