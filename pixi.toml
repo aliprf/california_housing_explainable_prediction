@@ -1,0 +1,44 @@
+[project]
+name = "california_housing_explainable_prediction"
+version = "0.1.0"
+authors = ["Aliprf <aliprf@gmail.com>"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+scikit-learn = "*"
+pandas = "*"
+matplotlib = "*"
+seaborn = "*"
+shap = "*"
+flask = "*"
+pydantic = "*"
+
+[feature.prod.dependencies]
+
+[feature.dev.dependencies]
+pytest = "*"
+
+[environments.prod]
+features = ["prod"]
+
+[environments.dev]
+features = ["prod", "dev"]
+
+
+[tasks.test]
+cmd = "pytest --maxfail=1 --disable-warnings -q"
+env = { PYTHONPATH = "." }
+
+
+[tasks.run_script]
+cmd = "python"
+args = ["${file}"]
+env = { PYTHONPATH = "." }
+
+
+[tasks.up]
+cmd = ["python", "main.py"]
+
+[pypi-dependencies]
+gradio = "*"
