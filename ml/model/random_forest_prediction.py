@@ -1,20 +1,17 @@
+import logging
 import os
 from random import randint
-
-import logging
 from typing import Union
+
+import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import f1_score, mean_squared_error, precision_score, recall_score
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, f1_score, precision_score, recall_score
-import joblib
-
 
 from config import Config
-
 from ml.common.schemas.california_housing_model import CaliforniaHousingModel
 from ml.data_parser.data_parser import DataParser
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -22,6 +19,7 @@ if not logger.handlers:
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s - %(message)s"))
     logger.addHandler(handler)
+
 
 class RandomForestPrediction:
     def __init__(self, model_path: str = Config.MODEL_PATH):
@@ -36,16 +34,21 @@ class RandomForestPrediction:
         self.y_train = None
         self.y_test = None
 
-    def train(self, test_size: float = 0.25, random_state: int = randint(1, 100), **rf_kwargs):
+    def train(
+        self, test_size: float = 0.25, random_state: int = randint(1, 100), **rf_kwargs
+    ):
         logger.info("Training Random Forest model.")
         X = self.df.drop("MedHouseVal", axis=1)
         y = self.df["MedHouseVal"]
 
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=test_size, random_state=random_state
+            X,
+            y,
+            test_size=test_size,
+            random_state=random_state,
         )
         logger.info(
-            f"Training samples: {len(self.X_train)}, Test samples: {len(self.X_test)}"
+            f"Training samples: {len(self.X_train)}, Test samples: {len(self.X_test)}",
         )
 
         self.model = RandomForestRegressor(**rf_kwargs)
@@ -62,10 +65,10 @@ class RandomForestPrediction:
             joblib.dump(self.model, self.model_path)
             logger.info(f"Model saved to {self.model_path}")
             # Save test set as well for later evaluation
-            
+
             if self.X_test is None or self.y_test is None:
                 raise ValueError("test ds was not found")
-            
+
             self.X_test.to_csv(Config.X_TEST_PATH, index=False)
             self.y_test.to_csv(Config.Y_TEST_PATH, index=False)
             logger.info("Test set saved for later evaluation.")
@@ -77,11 +80,11 @@ class RandomForestPrediction:
         if os.path.exists(self.model_path):
             self.model = joblib.load(self.model_path)
             logger.info(f"Model loaded from {self.model_path}")
-            
+
             # Load the saved test set
             self.X_test = pd.read_csv(Config.X_TEST_PATH)
             self.y_test = pd.read_csv(
-                Config.Y_TEST_PATH
+                Config.Y_TEST_PATH,
             ).squeeze()
             logger.info("Test set loaded for evaluation.")
         else:
@@ -96,7 +99,8 @@ class RandomForestPrediction:
         return self.model.predict(X)
 
     def predict(
-        self, input_data: Union[CaliforniaHousingModel, list[CaliforniaHousingModel]]
+        self,
+        input_data: Union[CaliforniaHousingModel, list[CaliforniaHousingModel]],
     ):
         if self.model is None:
             logger.error("Model is not loaded or trained.")
@@ -118,7 +122,7 @@ class RandomForestPrediction:
         self,
         y_true,
         y_pred,
-        threshold: float| None = None,
+        threshold: float | None = None,
         save_path: str = f"{Config.RF_MODEL_WEIGHTS_PATH}evaluation_metrics.txt",
     ):
         if threshold is None:
@@ -131,7 +135,7 @@ class RandomForestPrediction:
         recall = recall_score(y_true_bin, y_pred_bin)
 
         logger.info(
-            f"Evaluation metrics (threshold={threshold:.2f}): F1={f1:.4f}, Precision={precision:.4f}, Recall={recall:.4f}"
+            f"Evaluation metrics (threshold={threshold:.2f}): F1={f1:.4f}, Precision={precision:.4f}, Recall={recall:.4f}",
         )
 
         # Prepare metrics text
@@ -159,7 +163,6 @@ if __name__ == "__main__":
     trainer.train()
     trainer.save_model()
 
-    #
     if trainer.X_test is None:
         raise ValueError("trainer.X_test is None!!")
     y_pred = trainer.predict_df(trainer.X_test)
@@ -168,7 +171,7 @@ if __name__ == "__main__":
     # Step 2: Load weights and predict on a sample input
     trainer.load_model()
     sample_dict = trainer.data_parser.get_sample_instance()
-    sample_input:CaliforniaHousingModel = CaliforniaHousingModel(**sample_dict)
+    sample_input: CaliforniaHousingModel = CaliforniaHousingModel(**sample_dict)
     prediction = trainer.predict(sample_input)
 
     logger.info("Predicted Median House Values:")
