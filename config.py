@@ -15,5 +15,6 @@ class Config:
     X_TEST_PATH: str = f"{_ml_data_prefix}X_test.csv"
     Y_TEST_PATH: str = f"{_ml_data_prefix}y_test.csv"
 
-    RF_MODEL_WEIGHTS_PATH: str = _ml_weights_prefix 
+    RF_MODEL_WEIGHTS_PATH: str = _ml_weights_prefix
     RF_MODEL_WEIGHT_NAME: str = f"{_ml_weights_prefix }random_forest.pkl"
+    SHAP_CACHE_PATH: str = f"{_ml_weights_prefix}shap_values.pkl"
