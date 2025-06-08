@@ -39,9 +39,13 @@ env = { PYTHONPATH = "." }
 
 [tasks.train]
 cmd = ["python", "ml/model/random_forest_prediction.py"]
+env = { PYTHONPATH = "." }
+
 
 [tasks.explain_rf]
 cmd = ["python", "ml/model/random_forest_explainer.py"]
+env = { PYTHONPATH = "." }
+
 
 [tasks.up]
 cmd = ["python", "main.py"]
