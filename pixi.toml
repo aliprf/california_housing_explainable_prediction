@@ -49,6 +49,7 @@ env = { PYTHONPATH = "." }
 
 [tasks.up]
 cmd = ["python", "main.py"]
+env = { PYTHONPATH = "." }
 
 [pypi-dependencies]
 gradio = "*"

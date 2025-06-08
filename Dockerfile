@@ -1,41 +1,20 @@
-### --- Build Stage --- ###
-FROM ghcr.io/prefix-dev/pixi:latest AS build
+# Use official Pixi image for reproducible environments
+FROM ghcr.io/prefix-dev/pixi:latest
 
+# Set working directory inside container
 WORKDIR /app
+
+# Copy Pixi environment files first to cache the layer
 COPY pixi.toml pixi.lock ./
+
+# Install dependencies based on lockfile
+RUN pixi install --locked
+
+# Copy the rest of your application code
 COPY . .
 
-# Install locked dependencies and create env activation script
-RUN pixi install --locked \
-    && pixi shell-hook -s bash > /shell-hook.sh \
-    && echo 'exec "$@"' >> /shell-hook.sh
-
-### --- Runtime Stage --- ###
-FROM python:3.11-slim
-
-RUN apt-get update && apt-get install -y \
-    libglib2.0-0 libsm6 libxrender1 libxext6 curl \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy Pixi environment and activation script from build stage
-COPY --from=build /app/.pixi /app/.pixi
-COPY --from=build /shell-hook.sh /app/entrypoint.sh
-
-# Copy app source code
-COPY . .
-
-RUN chmod +x /app/entrypoint.sh
-
-# Ensure Pixi environment binaries are in PATH
-ENV PATH="/app/.pixi/envs/default/bin:$PATH"
-
-# Expose ports for FastAPI and Gradio
+# Expose required ports for FastAPI and Gradio
 EXPOSE 8000 7860
 
-# Entrypoint to activate Pixi environment, then run CMD
-ENTRYPOINT ["/app/entrypoint.sh"]
-
-# Run your app entrypoint
-CMD ["python", "main.py"]
+# Set the default command to run your application
+CMD ["pixi", "run", "up"]

@@ -8,7 +8,7 @@ def run_flask():
 
 def run_gradio():
     ui = build_ui()
-    ui.launch(server_name="127.0.0.1", server_port=7860)
+    ui.launch(server_name="0.0.0.0", server_port=7860)
 
 if __name__ == "__main__":
     t1 = threading.Thread(target=run_flask)
