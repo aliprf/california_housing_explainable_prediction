@@ -1,13 +1,18 @@
-name: Test and Deploy on Push to Master
+# .github/workflows/test-and-deploy.yml
+name: Test and Deploy
 
 on:
   push:
+    branches:
+      - '**'  
+  pull_request: 
     branches:
       - master
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    name: Run Tests
 
     steps:
       - name: Checkout code
@@ -23,14 +28,13 @@ jobs:
           curl -sSL https://pixi.sh/install.sh | bash -s -- --yes
           echo "$HOME/.pixi/bin" >> $GITHUB_PATH
 
-      - name: Run tests
-        run: pixi run test
+      - name: Run tests in dev environment
+        run: pixi run -e dev test
 
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: success()
-
+    if: github.ref == 'refs/heads/master' && success()
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
