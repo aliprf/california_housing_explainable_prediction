@@ -19,12 +19,6 @@ app = Flask(__name__)
 predictor = RandomForestPrediction()
 predictor.load_model()
 
-
-@app.route("/static/<path:filename>")
-def serve_static(filename):
-    return send_from_directory("static", filename)
-
-
 @app.route("/model_insight", methods=["POST"])
 def model_insight():
     pdp_plot_name = f"{Config.RF_MODEL_WEIGHTS_PATH}/pdp_plot.png"
@@ -48,12 +42,14 @@ def model_insight():
     )
     rules = explainer.get_rule_based_explanation()
 
-    return jsonify({
-        "rules": rules,
-        "feature_importance_img": f"{Config.RF_MODEL_WEIGHTS_PATH}/feature_importance.png",
-        "shap_plot": f"{Config.RF_MODEL_WEIGHTS_PATH}/shap_plot.png",
-        "pdp_plot": f"{Config.RF_MODEL_WEIGHTS_PATH}/pdp_plot.png",
-    })
+    return jsonify(
+        {
+            "rules": rules,
+            "feature_importance_img": f"{Config.RF_MODEL_WEIGHTS_PATH}/feature_importance.png",
+            "shap_plot": f"{Config.RF_MODEL_WEIGHTS_PATH}/shap_plot.png",
+            "pdp_plot": f"{Config.RF_MODEL_WEIGHTS_PATH}/pdp_plot.png",
+        },
+    )
 
 
 @app.route("/predict", methods=["POST"])
@@ -69,9 +65,11 @@ def predict():
     prediction = predictor.predict(model_input)
 
     # Return prediction
-    return jsonify({
-        "predicted_median_house_value": prediction[0],
-    })
+    return jsonify(
+        {
+            "predicted_median_house_value": prediction[0],
+        },
+    )
 
 
 if __name__ == "__main__":
