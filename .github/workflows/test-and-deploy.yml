@@ -1,13 +1,18 @@
-name: Test and Deploy on Push to Master
+# .github/workflows/test-and-deploy.yml
+name: Test and Deploy
 
 on:
   push:
+    branches:
+      - '**'  
+  pull_request: 
     branches:
       - master
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    name: Run Tests
 
     steps:
       - name: Checkout code
@@ -16,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.10"  # or whatever version you're using
 
       - name: Install Pixi
         run: |
@@ -29,11 +34,11 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: success()
-
+    if: github.ref == 'refs/heads/master' && success()
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Deploy Step
-        run: echo "✅ All tests passed. Deploying..."  # Replace with your actual deploy logic
+        run: echo "✅ All tests passed. Deploying..."  # replace with real deploy
+
