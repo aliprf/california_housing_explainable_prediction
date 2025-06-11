@@ -1,70 +1,69 @@
-name: Build and Deploy to GKE
+name: GKE Deploy Workflow
 
 on:
   push:
     branches:
-      - main
-      - master
+      - master  # Run on pushes to master branch
 
 env:
-  PROJECT_ID: ${{ secrets.PROJECT_ID }}
-  REGION: ${{ secrets.REGION }}
-  REPO_NAME: ${{ secrets.REPO_NAME }}
-  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
-  CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
-  DEPLOYMENT_NAME: ${{ secrets.DEPLOYMENT_NAME }}
-  NAMESPACE: ${{ secrets.NAMESPACE }}
+  PROJECT_ID: your-gcp-project-id           # Your GCP project ID
+  REGION: us-central1                       # Artifact Registry and GKE region
+  REPO_NAME: your-artifact-repo             # Artifact Registry repository name
+  IMAGE_NAME: california-housing-app        # Docker image name
+  CLUSTER_NAME: your-gke-cluster             # GKE cluster name
+  DEPLOYMENT_NAME: your-k8s-deployment       # Kubernetes Deployment name
+  NAMESPACE: default                          # Kubernetes namespace
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+    # Step 1: Set up Google Cloud CLI using the latest stable setup-gcloud action (@v2)
+    # Uses the service account JSON key stored in GitHub Secrets as GCLOUD_KEY_JSON
+    - name: Set up Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        service_account_key: ${{ secrets.GCLOUD_KEY_JSON }}
+        project_id: ${{ env.PROJECT_ID }}
 
-      - name: Setup gcloud CLI and kubectl
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-          install_components: kubectl
+    # Step 2: Configure Docker authentication to Artifact Registry
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker "${REGION}-docker.pkg.dev"
 
-      - name: Show active authenticated account
-        run: |
-          echo "Currently authenticated as:"
-          gcloud auth list --filter=status:ACTIVE --format="value(account)"
+    # Step 3: Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest" .
 
-      - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev"
+    # Step 4: Push Docker image to Artifact Registry
+    - name: Push Docker image
+      run: |
+        docker push "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest"
 
-      - name: Build Docker image
-        id: build-image
-        run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          GIT_SHA=$(git rev-parse --short HEAD)
-          TAG="${TIMESTAMP}-${GIT_SHA}"
-          IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${TAG}"
-          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+    # Step 5: Get GKE credentials for kubectl to use
+    - name: Get GKE Credentials
+      run: |
+        gcloud container clusters get-credentials "$CLUSTER_NAME" --region "$REGION" --project "$PROJECT_ID"
 
-          docker build -t "$IMAGE_URI" .
+    # Step 6: Deploy or upgrade the Helm chart (assumes you have a Helm chart in ./helm_chart)
+    - name: Deploy Helm chart to GKE
+      run: |
+        helm upgrade --install "${DEPLOYMENT_NAME}" ./helm_chart \
+          --namespace "${NAMESPACE}" \
+          --set image.repository="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}" \
+          --set image.tag="latest"
 
-      - name: Push Docker image
-        run: docker push ${{ env.IMAGE_URI }}
+    # Step 7: Wait for deployment rollout to complete
+    - name: Wait for rollout
+      run: |
+        kubectl rollout status deployment/"${DEPLOYMENT_NAME}" -n "${NAMESPACE}"
 
-      - name: Get GKE credentials
-        run: |
-          gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }}
-
-      - name: Deploy with Helm
-        run: |
-          helm upgrade --install ${{ env.DEPLOYMENT_NAME }} ./helm_chart \
-            --namespace ${{ env.NAMESPACE }} \
-            --create-namespace \
-            --set image.repository="${{ env.IMAGE_URI%:* }}" \
-            --set image.tag="${{ env.IMAGE_URI##*: }}"
+    # Step 8: Print all services in the namespace to verify deployment
+    - name: Print GKE Services
+      run: |
+        kubectl get services -n "${NAMESPACE}"
