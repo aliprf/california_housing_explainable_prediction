@@ -43,6 +43,12 @@ jobs:
       with:
         version: '>= 464.0.0'
 
+    # 4.5 Install gke-gcloud-auth-plugin
+    - name: Install gke-gcloud-auth-plugin
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+
     # 5. Configure Docker to use gcloud credentials
     - name: Configure Docker for Artifact Registry
       run: |
