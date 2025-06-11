@@ -1,0 +1,10 @@
+clusterName: ""
+deploymentName: ""
+imageFullPath: ""
+namespace: ""
+projectId: ""
+region: ""
+repoName: ""
+
+secrets:
+  DEPLOYMENT_NAME: ""

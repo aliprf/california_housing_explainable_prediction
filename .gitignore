@@ -1,3 +1,5 @@
+./helm_chart/key-file.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -177,3 +179,4 @@ ml/weights
 .vscode
 .gradio/flagged
 main
+helm_chart/key-file.json
