@@ -21,7 +21,7 @@ jobs:
       DEPLOYMENT_NAME: housing-api
       NAMESPACE: default
 
-    steps:
+    steps:    
     # 1. Checkout code
     - name: Checkout repository
       uses: actions/checkout@v3
