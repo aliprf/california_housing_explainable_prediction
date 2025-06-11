@@ -1,75 +1,80 @@
-name: GKE CI/CD Deploy
+# .github/workflows/deploy.yml
+
+name: Deploy to GKE
 
 on:
   push:
     branches:
-      - master  # Trigger only on push to master branch
+      - master
 
 jobs:
   deploy:
-    name: Deploy to GKE
+    name: Build and Deploy to GKE
     runs-on: ubuntu-latest
 
     env:
+      PROJECT_ID: personal-projects-462220-id
       REGION: us-central1
-      PROJECT_ID: ${{ secrets.PROJECT_ID }}
-      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
-      DEPLOYMENT_NAME: ${{ secrets.DEPLOYMENT_NAME }}
-      NAMESPACE: ${{ secrets.NAMESPACE }}
       REPO_NAME: california-housing-explain-ai
-      IMAGE_NAME: webapp
+      IMAGE_NAME: california-housing-api
+      CLUSTER_NAME: gke-cluster
+      DEPLOYMENT_NAME: housing-api
+      NAMESPACE: default
 
     steps:
-    # Step 1: Checkout code
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+    # 1. Checkout code
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-    # Step 2: Authenticate with service account JSON from GitHub Secret
+    # 2. Decode and write service account key from base64
+    - name: Decode and write service account key
+      run: |
+        echo "${{ secrets.GCLOUD_KEY_JSON_B64 }}" | base64 -d > gcloud-key.json
+
+    # 3. Authenticate with Google Cloud using decoded credentials
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v1
       with:
-        credentials_json: '${{ secrets.GCLOUD_KEY_JSON }}'
+        credentials_json: '${{ secrets.GCLOUD_KEY_JSON_B64 }}'
 
-    # Step 3: Set up gcloud CLI
-    - name: Set up gcloud CLI
+    # 4. Setup gcloud CLI
+    - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
-        project_id: ${{ env.PROJECT_ID }}
-        install_components: 'gke-gcloud-auth-plugin'
+        version: '>= 464.0.0'
 
-    # Step 4: Configure Docker to use Artifact Registry
+    # 5. Configure Docker to use gcloud credentials
     - name: Configure Docker for Artifact Registry
       run: |
-        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-    # Step 5: Build Docker image and push to Artifact Registry
-    - name: Build and Push Docker Image
+    # 6. Build Docker image
+    - name: Build Docker image
       run: |
-        IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:latest"
-        echo "🔨 Building image: $IMAGE_URI"
-        docker build -t "$IMAGE_URI" .
-        echo "🚀 Pushing image to Artifact Registry..."
-        docker push "$IMAGE_URI"
-        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+        docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
-    # Step 6: Get credentials for the GKE cluster
-    - name: Authenticate kubectl with GKE
+    # 7. Push image to Artifact Registry
+    - name: Push Docker image
+      run: |
+        docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    # 8. Get GKE credentials
+    - name: Get GKE credentials
       run: |
         gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
           --region ${{ env.REGION }} \
           --project ${{ env.PROJECT_ID }}
 
-    # Step 7: Deploy using Helm
-    - name: Helm Upgrade and Install
+    # 9. Deploy using Helm
+    - name: Deploy with Helm
       run: |
         helm upgrade --install ${{ env.DEPLOYMENT_NAME }} ./helm_chart \
           --namespace ${{ env.NAMESPACE }} \
           --create-namespace \
-          --set image.repository="${IMAGE_URI%:*}" \
-          --set image.tag="${IMAGE_URI##*:}"
+          --set image.repository=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }} \
+          --set image.tag=${{ github.sha }}
 
-    # Step 8: Print Service Info
-    - name: Print Kubernetes Service Info
+    # 10. Print the service info
+    - name: Show deployed service
       run: |
-        echo "🔎 Listing services in namespace: ${{ env.NAMESPACE }}"
         kubectl get svc -n ${{ env.NAMESPACE }}
