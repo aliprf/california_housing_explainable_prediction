@@ -21,24 +21,33 @@ jobs:
       run: |
         echo "${{ secrets.GCLOUD_KEY_JSON_B64 }}" | base64 -d > helm_chart/key-file.json
 
-    - name: Authenticate with GCP
+    - name: Authenticate with GCP and load secrets
+      id: gcp_auth
       run: |
         gcloud auth activate-service-account --key-file=helm_chart/key-file.json
-        export PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
-        gcloud config set project "$PROJECT_ID"
+
+        PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
+        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
+        IMAGE_NAME=$(gcloud secrets versions access latest --secret="IMAGE_NAME" --project="personal-projects-462220-id")
+        REPO_NAME=$(gcloud secrets versions access latest --secret="REPO_NAME" --project="personal-projects-462220-id")
+        CLUSTER_NAME=$(gcloud secrets versions access latest --secret="CLUSTER_NAME" --project="personal-projects-462220-id")
+        DEPLOYMENT_NAME=$(gcloud secrets versions access latest --secret="DEPLOYMENT_NAME" --project="personal-projects-462220-id")
+        NAMESPACE=$(gcloud secrets versions access latest --secret="NAMESPACE" --project="personal-projects-462220-id")
+
+        echo "PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
+        echo "REGION=$REGION" >> $GITHUB_ENV
+        echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+        echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+        echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+        echo "DEPLOYMENT_NAME=$DEPLOYMENT_NAME" >> $GITHUB_ENV
+        echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
 
     - name: Configure Docker for Artifact Registry
       run: |
-        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
-        gcloud auth configure-docker "$REGION-docker.pkg.dev"
+        gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 
     - name: Build and push Docker image
       run: |
-        IMAGE_NAME=$(gcloud secrets versions access latest --secret="IMAGE_NAME" --project="personal-projects-462220-id")
-        REPO_NAME=$(gcloud secrets versions access latest --secret="REPO_NAME" --project="personal-projects-462220-id")
-        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
-        PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
-
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         GIT_SHA=$(git rev-parse --short HEAD)
         TAG="${TIMESTAMP}-${GIT_SHA}"
@@ -51,27 +60,35 @@ jobs:
         echo "📦 Pushing image: $FULL_IMAGE"
         docker push "$FULL_IMAGE"
 
-        echo "IMAGE_TAG=$FULL_IMAGE" >> $GITHUB_ENV
+        echo "IMAGE_REPOSITORY=${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
     - name: Get GKE credentials
       run: |
-        CLUSTER_NAME=$(gcloud secrets versions access latest --secret="CLUSTER_NAME" --project="personal-projects-462220-id")
-        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
-        PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
-
-        gcloud container clusters get-credentials "$CLUSTER_NAME" \
-          --region "$REGION" \
-          --project "$PROJECT_ID"
+        gcloud container clusters get-credentials "$CLUSTER_NAME" --region "$REGION" --project "$PROJECT_ID"
 
     - name: Install Helm
       uses: azure/setup-helm@v3
 
     - name: Deploy using Helm
       run: |
-        DEPLOYMENT_NAME=$(gcloud secrets versions access latest --secret="DEPLOYMENT_NAME" --project="personal-projects-462220-id")
-        NAMESPACE=$(gcloud secrets versions access latest --secret="NAMESPACE" --project="personal-projects-462220-id")
         helm upgrade --install "$DEPLOYMENT_NAME" ./helm_chart \
           --namespace "$NAMESPACE" \
           --create-namespace \
-          --set image.repository="${{ env.IMAGE_TAG%:* }}" \
-          --set image.tag="${{ env.IMAGE_TAG##*: }}"
+          --set image.repository="$IMAGE_REPOSITORY" \
+          --set image.tag="$IMAGE_TAG"
+
+    - name: Wait for External IP and print
+      run: |
+        SERVICE_NAME="${DEPLOYMENT_NAME}-service"
+        for i in {1..20}; do
+          EXTERNAL_IP=$(kubectl get svc $SERVICE_NAME -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          if [ -n "$EXTERNAL_IP" ]; then
+            echo "🚀 Service External IP: $EXTERNAL_IP"
+            exit 0
+          fi
+          echo "Waiting for external IP assignment... ($i/20)"
+          sleep 15
+        done
+        echo "❌ Failed to get external IP after waiting."
+        exit 1
