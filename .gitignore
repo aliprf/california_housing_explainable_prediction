@@ -179,3 +179,4 @@ ml/weights
 .vscode
 .gradio/flagged
 main
+helm_chart/key-file.json
