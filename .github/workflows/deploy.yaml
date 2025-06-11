@@ -54,7 +54,7 @@ jobs:
         else
           echo "✅ Artifact Registry repository $REPO_NAME already exists."
         fi
- 
+
     - name: Build and push Docker image
       run: |
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
