@@ -1,0 +1,77 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up gcloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: '>= 464.0.0'
+
+    - name: Decode service account key
+      run: |
+        echo "${{ secrets.GCLOUD_KEY_JSON_B64 }}" | base64 -d > helm_chart/key-file.json
+
+    - name: Authenticate with GCP
+      run: |
+        gcloud auth activate-service-account --key-file=helm_chart/key-file.json
+        export PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
+        gcloud config set project "$PROJECT_ID"
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
+        gcloud auth configure-docker "$REGION-docker.pkg.dev"
+
+    - name: Build and push Docker image
+      run: |
+        IMAGE_NAME=$(gcloud secrets versions access latest --secret="IMAGE_NAME" --project="personal-projects-462220-id")
+        REPO_NAME=$(gcloud secrets versions access latest --secret="REPO_NAME" --project="personal-projects-462220-id")
+        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
+        PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
+
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        GIT_SHA=$(git rev-parse --short HEAD)
+        TAG="${TIMESTAMP}-${GIT_SHA}"
+
+        FULL_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${TAG}"
+
+        echo "🔨 Building image: $FULL_IMAGE"
+        docker build -t "$FULL_IMAGE" .
+
+        echo "📦 Pushing image: $FULL_IMAGE"
+        docker push "$FULL_IMAGE"
+
+        echo "IMAGE_TAG=$FULL_IMAGE" >> $GITHUB_ENV
+
+    - name: Get GKE credentials
+      run: |
+        CLUSTER_NAME=$(gcloud secrets versions access latest --secret="CLUSTER_NAME" --project="personal-projects-462220-id")
+        REGION=$(gcloud secrets versions access latest --secret="REGION" --project="personal-projects-462220-id")
+        PROJECT_ID=$(gcloud secrets versions access latest --secret="PROJECT_ID" --project="personal-projects-462220-id")
+
+        gcloud container clusters get-credentials "$CLUSTER_NAME" \
+          --region "$REGION" \
+          --project "$PROJECT_ID"
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+
+    - name: Deploy using Helm
+      run: |
+        DEPLOYMENT_NAME=$(gcloud secrets versions access latest --secret="DEPLOYMENT_NAME" --project="personal-projects-462220-id")
+        NAMESPACE=$(gcloud secrets versions access latest --secret="NAMESPACE" --project="personal-projects-462220-id")
+        helm upgrade --install "$DEPLOYMENT_NAME" ./helm_chart \
+          --namespace "$NAMESPACE" \
+          --create-namespace \
+          --set image.repository="${{ env.IMAGE_TAG%:* }}" \
+          --set image.tag="${{ env.IMAGE_TAG##*: }}"
