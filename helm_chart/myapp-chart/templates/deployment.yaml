@@ -1,20 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "california-housing-app.fullname" . }}
+  labels:
+    app: {{ include "california-housing-app.name" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}
+      app: {{ include "california-housing-app.name" . }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
+        app: {{ include "california-housing-app.name" . }}
     spec:
       containers:
-        - name: app
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          ports:
-            - containerPort: 8080
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.containerPort }}

@@ -1,5 +1,6 @@
 apiVersion: v2
-name: myapp
-description: A Helm chart for my GKE app
+name: california-housing-app
+description: A Helm chart for California Housing AI app
+type: application
 version: 0.1.0
 appVersion: "1.0"
