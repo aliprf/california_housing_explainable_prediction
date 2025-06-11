@@ -27,7 +27,7 @@ jobs:
       - name: Authenticate with GCP
         run: |
           gcloud auth activate-service-account --key-file=helm_chart/key-file.json
-          gcloud config set project "$INFRA_SECRETS_PROJECT"
+          gcloud config sdset project "$INFRA_SECRETS_PROJECT"
 
       - name: Configure Docker for Artifact Registry
         run: |
