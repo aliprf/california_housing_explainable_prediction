@@ -17,7 +17,7 @@ jobs:
       REGION: us-central1
       REPO_NAME: california-housing-explain-ai
       IMAGE_NAME: california-housing-api
-      CLUSTER_NAME: gke-cluster
+      CLUSTER_NAME: ml-gke-cluster-1
       DEPLOYMENT_NAME: housing-api
       NAMESPACE: default
 
