@@ -1,6 +1,5 @@
 apiVersion: v2
-name: california-housing-app
-description: A Helm chart for California Housing AI app
-type: application
+name: california-housing-explain-ai
 version: 0.1.0
 appVersion: "1.0"
+description: A Helm chart for deploying the California Housing Explainable AI service to GKE

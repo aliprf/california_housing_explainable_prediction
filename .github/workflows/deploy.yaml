@@ -1,0 +1,75 @@
+name: GKE CI/CD Deploy
+
+on:
+  push:
+    branches:
+      - master  # Trigger only on push to master branch
+
+jobs:
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+
+    env:
+      REGION: us-central1
+      PROJECT_ID: ${{ secrets.PROJECT_ID }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+      DEPLOYMENT_NAME: ${{ secrets.DEPLOYMENT_NAME }}
+      NAMESPACE: ${{ secrets.NAMESPACE }}
+      REPO_NAME: california-housing-explain-ai
+      IMAGE_NAME: webapp
+
+    steps:
+    # Step 1: Checkout code
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    # Step 2: Authenticate with service account JSON from GitHub Secret
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: '${{ secrets.GCLOUD_KEY_JSON }}'
+
+    # Step 3: Set up gcloud CLI
+    - name: Set up gcloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: ${{ env.PROJECT_ID }}
+        install_components: 'gke-gcloud-auth-plugin'
+
+    # Step 4: Configure Docker to use Artifact Registry
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+    # Step 5: Build Docker image and push to Artifact Registry
+    - name: Build and Push Docker Image
+      run: |
+        IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:latest"
+        echo "🔨 Building image: $IMAGE_URI"
+        docker build -t "$IMAGE_URI" .
+        echo "🚀 Pushing image to Artifact Registry..."
+        docker push "$IMAGE_URI"
+        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+    # Step 6: Get credentials for the GKE cluster
+    - name: Authenticate kubectl with GKE
+      run: |
+        gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
+          --region ${{ env.REGION }} \
+          --project ${{ env.PROJECT_ID }}
+
+    # Step 7: Deploy using Helm
+    - name: Helm Upgrade and Install
+      run: |
+        helm upgrade --install ${{ env.DEPLOYMENT_NAME }} ./helm_chart \
+          --namespace ${{ env.NAMESPACE }} \
+          --create-namespace \
+          --set image.repository="${IMAGE_URI%:*}" \
+          --set image.tag="${IMAGE_URI##*:}"
+
+    # Step 8: Print Service Info
+    - name: Print Kubernetes Service Info
+      run: |
+        echo "🔎 Listing services in namespace: ${{ env.NAMESPACE }}"
+        kubectl get svc -n ${{ env.NAMESPACE }}

@@ -1,11 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "california-housing-app.fullname" . }}
+  name: california-housing-explain-ai
 spec:
   type: {{ .Values.service.type }}
-  ports:
-  - port: {{ .Values.service.port }}
-    targetPort: {{ .Values.containerPort }}
   selector:
-    app: {{ include "california-housing-app.name" . }}
+    app: california-housing-explain-ai
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}

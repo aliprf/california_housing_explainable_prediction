@@ -1,21 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "california-housing-app.fullname" . }}
-  labels:
-    app: {{ include "california-housing-app.name" . }}
+  name: california-housing-explain-ai
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
-      app: {{ include "california-housing-app.name" . }}
+      app: california-housing-explain-ai
   template:
     metadata:
       labels:
-        app: {{ include "california-housing-app.name" . }}
+        app: california-housing-explain-ai
     spec:
       containers:
-      - name: {{ .Chart.Name }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        ports:
-        - containerPort: {{ .Values.containerPort }}
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 7860
