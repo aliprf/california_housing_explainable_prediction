@@ -42,6 +42,18 @@ jobs:
         echo "DEPLOYMENT_NAME=$DEPLOYMENT_NAME" >> $GITHUB_ENV
         echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
 
+    - name: Create Artifact Registry Docker repo if missing
+      run: |
+        if ! gcloud artifacts repositories describe "$REPO_NAME" --location="$REGION" &> /dev/null; then
+          echo "Creating Artifact Registry repository $REPO_NAME in $REGION..."
+          gcloud artifacts repositories create "$REPO_NAME" \
+            --repository-format=docker \
+            --location="$REGION" \
+            --description="Docker repo for GKE deployments"
+        else
+          echo "Artifact Registry repository $REPO_NAME already exists."
+        fi
+
     - name: Configure Docker for Artifact Registry
       run: |
         gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
